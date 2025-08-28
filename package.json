@@ -1,22 +1,26 @@
 {
-  "name": "n8n-nodes-<...>",
+  "name": "n8n-nodes-signalspam",
   "version": "0.1.0",
-  "description": "",
+  "description": "n8n node to report spam to Signal-Spam.fr (French official anti-spam platform)",
   "keywords": [
-    "n8n-community-node-package"
+    "n8n-community-node-package",
+    "signalspam",
+    "spam",
+    "france",
+    "security",
+    "anti-spam",
+    "email",
+    "sms"
   ],
   "license": "MIT",
-  "homepage": "",
+  "homepage": "https://github.com/hihouhou/n8n-nodes-signalspam",
   "author": {
-    "name": "",
-    "email": ""
+    "name": "hihouhou",
+    "email": "hihouhou@hihouhou.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
-  },
-  "engines": {
-    "node": ">=20.15"
+    "url": "git+https://github.com/hihouhou/n8n-nodes-signalspam.git"
   },
   "main": "index.js",
   "scripts": {
@@ -33,12 +37,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/SignalSpamApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/SignalSpam/SignalSpam.node.js"
     ]
   },
   "devDependencies": {
