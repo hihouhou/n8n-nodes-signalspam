@@ -102,7 +102,7 @@ export class SignalSpam implements INodeType {
 	}
 
 	private async reportSpamToSignalSpam(executeFunctions: IExecuteFunctions, itemIndex: number): Promise<any> {
-		const credentials = await executeFunctions.getCredentials('signalSpamApi');
+		const credentials = await executeFunctions.getCredentials('SignalSpamApi');
 
 		const emailContent = executeFunctions.getNodeParameter('emailContent', itemIndex) as string;
 
