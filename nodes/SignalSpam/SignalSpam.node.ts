@@ -3,7 +3,6 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	NodeOperationError,
 	NodeConnectionType,
 	IHttpRequestMethods,
 } from 'n8n-workflow';
@@ -45,15 +44,15 @@ export class SignalSpam implements INodeType {
 				default: 'reportSpam',
 			},
 			{
-				displayName: 'Email Content',
-				name: 'emailContent',
+				displayName: 'Raw Email',
+				name: 'rawEmail',
 				type: 'string',
 				typeOptions: {
 					rows: 10,
 				},
 				default: '',
-				placeholder: 'Full email content including headers',
-				description: 'The complete email content to report as spam',
+				placeholder: '{{ $json.raw }}',
+				description: 'The raw email content',
 				required: true,
 			},
 		],
@@ -62,24 +61,48 @@ export class SignalSpam implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const nodeInstance = this.getNode();
 
 		for (let i = 0; i < items.length; i++) {
 			try {
-				const operation = this.getNodeParameter('operation', i) as string;
+				const credentials = await this.getCredentials('SignalSpamApi');
+				const rawEmail = this.getNodeParameter('rawEmail', i) as string;
 
-				let responseData: any = {};
+				// Encoder en Base64
+				const base64Email = Buffer.from(rawEmail).toString('base64');
 
-				switch (operation) {
-					case 'reportSpam':
-						responseData = await SignalSpam.prototype.reportSpamToSignalSpam(this, i);
-						break;
-					default:
-						throw new NodeOperationError(nodeInstance, `The operation "${operation}" is not supported`);
-				}
+				// Authentification Basic
+				const authString = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+
+				// Boundary pour multipart
+				const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+				const body = [
+					`--${boundary}`,
+					'Content-Disposition: form-data; name="message"',
+					'',
+					base64Email,
+					`--${boundary}--`
+				].join('\r\n');
+
+				// Faire la requête HTTP
+				const options = {
+					method: 'POST' as IHttpRequestMethods,
+					url: 'https://www.signal-spam.fr/api/signaler',
+					headers: {
+						'Authorization': `Basic ${authString}`,
+						'Content-Type': `multipart/form-data; boundary=${boundary}`,
+						'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Thunderbird/52.4.0',
+					},
+					body: body,
+				};
+
+				const response = await this.helpers.httpRequest(options);
 
 				returnData.push({
-					json: responseData,
+					json: {
+						success: true,
+						message: 'Spam reported successfully',
+						response: response,
+					},
 					pairedItem: { item: i },
 				});
 
@@ -87,8 +110,8 @@ export class SignalSpam implements INodeType {
 				if (this.continueOnFail()) {
 					returnData.push({
 						json: {
+							success: false,
 							error: error.message,
-							success: false
 						},
 						pairedItem: { item: i },
 					});
@@ -99,83 +122,5 @@ export class SignalSpam implements INodeType {
 		}
 
 		return [returnData];
-	}
-
-	private async reportSpamToSignalSpam(executeFunctions: IExecuteFunctions, itemIndex: number): Promise<any> {
-		const credentials = await executeFunctions.getCredentials('SignalSpamApi');
-
-		const emailContent = executeFunctions.getNodeParameter('emailContent', itemIndex) as string;
-
-		// Prepare the spam report data
-		const reportData = this.prepareReportData(
-			emailContent
-		);
-
-		try {
-			// Submit to Signal Spam API using n8n's HTTP request helper
-			const result = await this.submitToSignalSpam(executeFunctions, credentials, reportData);
-
-			return {
-				success: true,
-				message: 'Spam reported successfully to Signal Spam',
-				reportId: result.id || 'unknown',
-				submittedAt: new Date().toISOString(),
-				response: result
-			};
-
-		} catch (error) {
-			throw new NodeOperationError(executeFunctions.getNode(), `Failed to report spam: ${error.message}`);
-		}
-	}
-
-	private prepareReportData(
-		emailContent: string
-	): any {
-		const reportData: any = {
-			// Signal Spam API fields
-			'email_content': emailContent
-		};
-
-		return reportData;
-	}
-
-	private async submitToSignalSpam(executeFunctions: IExecuteFunctions, credentials: any, reportData: any): Promise<any> {
-		// Prepare form data
-		const formData: any = {
-			'login': credentials.username,
-			'password': credentials.password,
-			...reportData
-		};
-
-		// Convert to URL-encoded string
-		const postData = Object.keys(formData)
-			.map(key => `${encodeURIComponent(key)}=${encodeURIComponent(formData[key])}`)
-			.join('&');
-
-		const options = {
-			method: 'POST' as IHttpRequestMethods,
-			url: 'https://www.signal-spam.fr/api/signaler',
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				'User-Agent': 'n8n-signalspam-node/1.0'
-			},
-			body: postData,
-		};
-
-		try {
-			const response = await executeFunctions.helpers.httpRequest(options);
-
-			return {
-				status: 'success',
-				response: response,
-				id: this.generateReportId()
-			};
-		} catch (error) {
-			throw new Error(`HTTP request failed: ${error.message}`);
-		}
-	}
-
-	private generateReportId(): string {
-		return `SS_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 	}
 }
